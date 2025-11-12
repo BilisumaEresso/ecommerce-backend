@@ -1,6 +1,8 @@
 const express = require("express");
 const connectMongoDb = require("./config/mongoDb");
 const { authRoute } = require("./router");
+const errorHandler = require("./middleware/errorHandler");
+const notFound = require("./controller/notFound");
 
 const app = express();
 
@@ -15,5 +17,9 @@ connectMongoDb();
 
 // basic health-check route
 app.get("/_health", (req, res) => res.json({ status: "ok" }));
+// not found route
+app.use("",notFound)
+// error handler
+app.use(errorHandler)
 
 module.exports = app;

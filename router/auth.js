@@ -1,9 +1,7 @@
 const express = require("express");
+const { authController } = require("../controller");
 const router = express.Router();
 
-router.post("/signup", (req, res, next) => {
-  console.log("request sent successfully");
-  return res.status(201).json({ message: "signup received", body: req.body });
-});
+router.post("/signup", authController.signup)
 
 module.exports = router;
