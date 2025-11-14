@@ -1,7 +1,7 @@
 const mongoose = require("mongoose");
 
 const categorySchema=new mongoose.Schema({
-    name:{type:String,required:true},
+    name:{type:String,unique:true,required:true},
     desc:{type:String},
     createdBy:{type:mongoose.Types.ObjectId,ref:"user"},
     // slug is for user friendly routing like "laptops"

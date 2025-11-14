@@ -1,6 +1,6 @@
 const express = require("express");
 const connectMongoDb = require("./config/mongoDb");
-const { authRoute } = require("./router");
+const { authRoute, categoryRoute } = require("./router");
 const errorHandler = require("./middleware/errorHandler");
 const notFound = require("./controller/notFound");
 
@@ -11,6 +11,7 @@ app.use(express.json());
 
 // routes class
 app.use("/api/v1/auth", authRoute);
+app.use("/api/v1/category",categoryRoute)
 
 // connect db
 connectMongoDb();
