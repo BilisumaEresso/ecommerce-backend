@@ -1,4 +1,4 @@
-const { Category } = require("../model")
+const { Category, Product } = require("../model")
 const slugify=require("slugify")
 
 const addCategory=async(req,res,next)=>{
@@ -33,6 +33,72 @@ const addCategory=async(req,res,next)=>{
     }
 }
 
+const getProducts=async(req,res,next)=>{
+    try{
+        const {id}=req.params
+        const products=await Product.find({category:id})
+        res.status(200).json({
+            code:200,
+            status:true,
+            message:"products fetched successfully",
+            products
+        })
+        
+    }catch(error){
+        next(error)
+    }
+}
+
+const updateCategory=async(req,res,next)=>{
+    try{
+        const {id}=req.params
+        const {name,desc}=req.body
+        const category=await Category.findById(id)
+        if(!category){
+            res.code=404
+            throw new Error("category not found")
+        }
+         const nameExist = await Category.findOne({ name });
+         if (nameExist) {
+           res.code = 400;
+           throw new Error("Category already exists");
+         }
+         const slug = await slugify(name, { lower: true });
+          category.name=name?name:category.name
+          category.desc=desc?desc:category.desc
+          category.slug=slug?slug:category.slug
+          await category.save()
+         res.status(201).json({
+           code: 201,
+           status: true,
+           message: "category updated successfully",
+           category,
+         });
+    }catch(error){
+        next(error)
+    }
+}
+
+const getCategory=async(req,res,next)=>{
+    try{
+        const {id}=req.params
+        const category=await Category.findById(id)
+        if(!category){
+            res.code=404
+            throw new Error("Category not found")
+
+        }
+        res.status(200).json({
+            code:200,
+            status:true,
+            message:"category detail fetched successfully",
+            category
+        })
+    }catch(error){
+        next(error)
+    }
+}
+
 const categoryList=async(req,res,next)=>{
     try{
         const {q}=req.query
@@ -57,4 +123,4 @@ const categoryList=async(req,res,next)=>{
     }
 }
 
-module.exports={addCategory,categoryList}
+module.exports={addCategory,categoryList,getCategory,updateCategory,getProducts}
