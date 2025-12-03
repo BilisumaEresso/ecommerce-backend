@@ -1,10 +1,15 @@
-const { Category, Product } = require("../model")
+const { Category, Product, User } = require("../model")
 const slugify=require("slugify")
 
 const addCategory=async(req,res,next)=>{
     try{
         const {name,desc}=req.body
         const {id}=req.user
+        const user =await User.findById(id)
+        if(!user){
+            res.code=404
+            throw new Error("user not found")
+        }
         if(!name){
             res.code=400
             throw new Error("category name is required")
@@ -123,4 +128,23 @@ const categoryList=async(req,res,next)=>{
     }
 }
 
-module.exports={addCategory,categoryList,getCategory,updateCategory,getProducts}
+const deleteCategory=async(req,res,next)=>{
+    try{
+        const {id}=req.params
+        const category=await Category.findByIdAndDelete(id)
+        if(!category){
+            res.code=404
+            throw new Error("category not found")
+        }
+        res.status(200).json({
+            code:200,
+            status:true,
+            message:"category deleted successfully"
+
+        })
+    }catch(error){
+        next(error)
+    }
+}
+
+module.exports={addCategory,categoryList,getCategory,updateCategory,getProducts,deleteCategory}

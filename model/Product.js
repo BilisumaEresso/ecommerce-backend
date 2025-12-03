@@ -6,11 +6,15 @@ const productSchema = new mongoose.Schema(
     desc: { type: String },
     quantity: { type: Number, default: 1 },
     price: { type: String, required: true },
-    review: { type: mongoose.Types.ObjectId, ref: "review" },
+    averageRating: {type: Number, default:0 },
+    rateNumber:{type:Number,default:0},
     category: {
       type: mongoose.Types.ObjectId,
       ref: "category",
-      default: "None",
+    },
+    createdBy:{
+      type:mongoose.Types.ObjectId,
+      ref:"user"
     },
     photo: [{ type: mongoose.Types.ObjectId, ref: "file" }],
   },
