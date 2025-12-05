@@ -3,6 +3,7 @@ const { default: mongoose } = require("mongoose");
 const orderSchema = new mongoose.Schema(
   {
     user: { type: mongoose.Types.ObjectId, ref: "user", required:true },
+    phoneNumber :{type: String},
     product: [
       {
         productId: { type: mongoose.Types.ObjectId, ref: "product" },
@@ -11,7 +12,7 @@ const orderSchema = new mongoose.Schema(
     ],
     address: { type: mongoose.Types.ObjectId, ref: "address" },
     cart: { type: mongoose.Types.ObjectId, ref: "cart" },
-    status: { type: String, enum: ["Delivered", "Pending", "Shipped"] },
+    status: { type: String,default:"Pending" },
   },
   { timestamps: true }
 );

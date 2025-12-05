@@ -1,6 +1,8 @@
 const { Product, File, Review } = require("../model");
+const mongoose = require("mongoose");
 const cloudinary = require("../config/cloudinary");
 const path = require("path");
+const { escape } = require("querystring");
 
 const addProduct = async (req, res, next) => {
   try {
@@ -296,6 +298,35 @@ const deleteProduct = async (req, res, next) => {
 };
 
 // Reviews
+// helper: recompute product aggregate ratings from reviews
+const recomputeProductStats = async (productId) => {
+  // ensure a valid ObjectId is used
+  const oid = mongoose.isValidObjectId(productId)
+    ? new mongoose.Types.ObjectId(productId)
+    : productId;
+  const res = await Review.aggregate([
+    { $match: { product: oid } },
+    {
+      $group: {
+        _id: null,
+        averageRating: { $avg: "$rating" },
+        rateNumber: { $sum: 1 },
+      },
+    },
+  ]);
+  if (res && res.length > 0) {
+    const { averageRating, rateNumber } = res[0];
+    await Product.findByIdAndUpdate(productId, {
+      averageRating: averageRating || 0,
+      rateNumber: rateNumber || 0,
+    });
+  } else {
+    await Product.findByIdAndUpdate(productId, {
+      averageRating: 0,
+      rateNumber: 0,
+    });
+  }
+};
 const addReview = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -309,24 +340,23 @@ const addReview = async (req, res, next) => {
       res.status(404);
       throw new Error("Product not found");
     }
-    const reviewed = await Review.findOne({
-      product: id,
-      user: req.user && req.user._id ? req.user._id : req.user.id,
-    });
-    if (reviewed) {
-      res.status(400);
-      throw new Error(
-        "You already rated this product. Update your review instead."
-      );
+    const userId = req.user && req.user._id ? req.user._id : req.user.id;
+    const existing = await Review.findOne({ product: id, user: userId });
+    if (existing) {
+      // update the existing review (upsert behavior)
+      const oldRating = existing.rating;
+      if (rating) existing.rating = rating;
+      if (comment) existing.comment = comment;
+      await existing.save();
+      // recompute product stats after update
+      await recomputeProductStats(id);
+      return res
+        .status(200)
+        .json({ code: 200, status: true, review: existing });
     }
-    // update average properly
-    const currentTotal =
-      (product.averageRating || 0) * (product.rateNumber || 0);
-    product.rateNumber = (product.rateNumber || 0) + 1;
-    product.averageRating = (currentTotal + rating) / product.rateNumber;
-    await product.save();
+    // create new review
     const review = new Review({
-      user: req.user && req.user._id ? req.user._id : req.user.id,
+      user: userId,
       product: id,
       rating,
       comment,
@@ -334,8 +364,8 @@ const addReview = async (req, res, next) => {
     try {
       await review.save();
     } catch (err) {
-      // handle race condition where unique index prevents duplicate reviews
       if (err && err.code === 11000) {
+        // unique constraint hit, return helpful message
         res.status(400);
         throw new Error(
           "You already rated this product. Update your review instead."
@@ -343,6 +373,8 @@ const addReview = async (req, res, next) => {
       }
       throw err;
     }
+    // recompute stats
+    await recomputeProductStats(id);
     res.status(201).json({ code: 201, status: true, review });
   } catch (error) {
     next(error);
@@ -367,18 +399,10 @@ const updateReview = async (req, res, next) => {
     const { rating, comment } = req.body;
     // If rating changed, update product averages
     if (rating && rating !== review.rating) {
-      const product = await Product.findById(id);
-      if (product) {
-        const oldRating = review.rating;
-        const rateNumber = product.rateNumber || 0;
-        if (rateNumber > 0) {
-          const currentTotal = (product.averageRating || 0) * rateNumber;
-          const newTotal = currentTotal - oldRating + rating;
-          product.averageRating = newTotal / rateNumber;
-          await product.save();
-        }
-      }
+      // update rating
       review.rating = rating;
+      // recompute product stats for accuracy
+      await recomputeProductStats(id);
     }
     if (comment) review.comment = comment;
     await review.save();
@@ -405,24 +429,90 @@ const deleteReview = async (req, res, next) => {
     // update product rating stats
     const product = await Product.findById(id);
     if (product) {
-      const oldRateNumber = product.rateNumber || 0;
-      const oldRating = review.rating || 0;
-      const newRateNumber = Math.max(0, oldRateNumber - 1);
-      if (newRateNumber === 0) {
-        product.averageRating = 0;
-        product.rateNumber = 0;
-      } else {
-        const total = (product.averageRating || 0) * oldRateNumber;
-        const newTotal = total - oldRating;
-        product.averageRating = newTotal / newRateNumber;
-        product.rateNumber = newRateNumber;
-      }
-      await product.save();
+      await recomputeProductStats(product._id);
     }
     await Review.findByIdAndDelete(reviewId);
     res
       .status(200)
       .json({ code: 200, status: true, message: "review deleted" });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const getReview = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const review = await Review.findById(id);
+    if (!review) {
+      res.code = 404;
+      throw new Error("review not found");
+    }
+    res.status(200).json({
+      code: 200,
+      review: review,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const getUserReview = async (req, res, next) => {
+  try {
+    const { id } = req.params; // product id
+    const userId = req.user && req.user._id ? req.user._id : req.user.id;
+    const review = await Review.findOne({ product: id, user: userId });
+    if (!review) {
+      return res
+        .status(404)
+        .json({ code: 404, status: false, message: "review not found" });
+    }
+    res.status(200).json({ code: 200, status: true, review });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const getAllReview = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const product = await Product.findById(id);
+    if (!product) {
+      res.code;
+      throw new Error("product not found");
+    }
+    const { page = 1, limit = 10 } = req.query;
+    const skip = (Number(page) - 1) * Number(limit);
+    const [reviews, count] = await Promise.all([
+      Review.find({ product: id })
+        .skip(skip)
+        .limit(Number(limit))
+        .sort({ createdAt: -1 })
+        .populate("user", "name email"),
+      Review.countDocuments({ product: id }),
+    ]);
+    if (!reviews || reviews.length === 0) {
+      return res.status(200).json({
+        code: 200,
+        status: true,
+        message: "no reviews yet",
+        reviews: [],
+        product,
+      });
+    }
+    res.status(200).json({
+      code: 200,
+      status: true,
+      message: "fetched successfully",
+      reviews,
+      product,
+      pagination: {
+        page: Number(page),
+        limit: Number(limit),
+        total: count,
+        pages: Math.ceil(count / Number(limit)),
+      },
+    });
   } catch (error) {
     next(error);
   }
@@ -439,4 +529,7 @@ module.exports = {
   addReview,
   updateReview,
   deleteReview,
+  getReview,
+  getAllReview,
+  getUserReview,
 };

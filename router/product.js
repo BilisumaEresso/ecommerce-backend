@@ -3,6 +3,7 @@ const { productController } = require("../controller");
 const isAuth = require("../middleware/isAuth");
 const isAdmin = require("../middleware/isAdmin");
 const { addProductValidator } = require("../validator/product");
+const { addReviewValidator } = require("../validator/review");
 const validate = require("../validator/validate");
 const multer = require("multer");
 const storage = multer.memoryStorage();
@@ -47,8 +48,25 @@ router.get("/", productController.getProducts);
 router.get("/category/:categoryId", productController.getProductsByCategory);
 router.get("/:id", productController.getProductById);
 
-router.post("/:id/review", isAuth, productController.addReview);
-router.patch("/:id/review/:reviewId", isAuth, productController.updateReview);
+router.post(
+  "/:id/review",
+  isAuth,
+  addReviewValidator,
+  validate,
+  productController.addReview
+);
+router.patch(
+  "/:id/review/:reviewId",
+  isAuth,
+  addReviewValidator,
+  validate,
+  productController.updateReview
+);
 router.delete("/:id/review/:reviewId", isAuth, productController.deleteReview);
+// reviews listing and individual user review
+router.get("/:id/reviews", productController.getAllReview);
+router.get("/:id/review", isAuth, productController.getUserReview);
+router.get("/review/:id", isAuth, productController.getReview);
+// (removed duplicate route) - '/:id/review' should return the current user's review via getUserReview
 
 module.exports = router;

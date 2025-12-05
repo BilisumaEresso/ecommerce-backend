@@ -1,6 +1,6 @@
 const express = require("express");
 const connectMongoDb = require("./config/mongoDb");
-const { authRoute, categoryRoute, productRouter } = require("./router");
+const { authRoute, categoryRoute, productRouter, orderRouter, cartRouter } = require("./router");
 const errorHandler = require("./middleware/errorHandler");
 const notFound = require("./controller/notFound");
 // initialize cloudinary (reads from .env)
@@ -16,6 +16,8 @@ app.use(express.urlencoded({ extended: true }));
 app.use("/api/v1/auth", authRoute);
 app.use("/api/v1/category", categoryRoute);
 app.use("/api/v1/product", productRouter);
+app.use("/api/v1/oder",orderRouter)
+app.use("/api/v1/cart",cartRouter)
 
 // connect db
 connectMongoDb();
