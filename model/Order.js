@@ -4,15 +4,18 @@ const orderSchema = new mongoose.Schema(
   {
     user: { type: mongoose.Types.ObjectId, ref: "user", required:true },
     phoneNumber :{type: String},
-    product: [
+    items: [
       {
-        productId: { type: mongoose.Types.ObjectId, ref: "product" },
+        product: { type: mongoose.Types.ObjectId, ref: "product" },
         quantity: { type: Number, min: 1, default: 1 },
+        price :{type:Number,required:true},
+        totalItemPrice:{type:Number,required:true}
       },
     ],
     address: { type: mongoose.Types.ObjectId, ref: "address" },
     cart: { type: mongoose.Types.ObjectId, ref: "cart" },
-    status: { type: String,default:"Pending" },
+    status: { type: String,enum:["pending","confirmed","paid","shipped","delivered","cancelled"],default:"pending" },
+    totalAmount:{type:Number,default:1,min:1}
   },
   { timestamps: true }
 );
