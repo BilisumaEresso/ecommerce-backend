@@ -1,4 +1,5 @@
-const { User, Order, Cart, Product } = require("../model");
+const { User, Order, Cart, Product, Payment } = require("../model");
+const generateTransactionId = require("../utils/generateTransactionID");
 
 const getAllOrders = async (req, res, next) => {
   try {
@@ -183,4 +184,61 @@ const cancelOrder=async(req,res,next)=>{
     }
 }
 
-module.exports = { getAllOrders, addOrder ,getOrder,updateStatus,cancelOrder};
+const payNow=async(req,res,next)=>{
+  try{
+    const {id}=req.body
+    if(!id){
+      res.code=400
+      throw new Error("order is required")
+    }
+    const order= await Order.findById(id).populate("user").populate("items.product")
+    if(!order){
+      res.code=404
+      throw new Error("order not found")
+    }
+     do {
+      var code=await generateTransactionId(16)
+      var exists=await Payment.findOne({transactionId:code})
+     }while(exists)
+      const transactionId= code 
+     const status="Completed"
+     const paymentMethod="Online"
+      const amount=await Number(order.totalAmount)
+       const payment=new Payment()
+       payment.order=order._id,
+        payment.transactionId=transactionId,
+        payment.paymentMethod=paymentMethod,
+        payment.amount=amount,
+        payment.status=status
+      await payment.save()
+      res.status(201).json({
+        code:201,
+        status:true,
+        message:"payment successfully completed",
+        payment
+      })
+  }catch(error){
+    next (error)
+  }
+}
+
+const paymentInfo=async(req,res,next)=>{
+  try{
+    const {id}=req.params
+    const payment= await Payment.findById(id).populate("order").populate("order.items.product")
+    if(!payment){
+      res.code=404
+      throw new Error("payment info not found")
+    }
+    res.status(200).json({
+      code:200,
+      status:true,
+      message:"payment info fetched successfully",
+      payment
+    })
+  }catch(error){
+    next(error)
+  }
+}
+
+module.exports = { getAllOrders, addOrder ,getOrder,updateStatus,cancelOrder,payNow,paymentInfo};
