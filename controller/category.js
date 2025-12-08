@@ -68,7 +68,7 @@ const updateCategory=async(req,res,next)=>{
            res.code = 400;
            throw new Error("Category already exists");
          }
-         const slug = await slugify(name, { lower: true });
+         const slug = await slugify(name||category.name, { lower: true })||category.slug
           category.name=name?name:category.name
           category.desc=desc?desc:category.desc
           category.slug=slug?slug:category.slug

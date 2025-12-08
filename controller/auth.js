@@ -1,28 +1,33 @@
-const {User}=require("../model")
+const {User, Address}=require("../model")
 const comparePassword = require("../utils/comparePassword")
 const generateToken = require("../utils/generateToken")
 const hashPassword = require("../utils/hashPassword")
 
 const signup=async(req,res,next)=>{
     try{
-        const {name,email,password}=req.body
+        const {name,email,password,phoneNumber,street,city,state,kebele,postalCode}=req.body
         const emailExist= await User.findOne({email})
         if(emailExist){
-            res.code=400
+            res.status(400)
             throw new Error ("email already exists")
         }
-        const user= new User
+        const address = new Address({name,phoneNumber,street,postalCode,kebele,city,state,isDefault:true})
+        await address.save()
+        const user = new User()
         const hashed=await hashPassword(password)
         user.name=name
         user.email=email
         user.password=hashed
-        await user.save()
-        const token=await generateToken(user)
+        user.address=address._id
+        const savedUser = await user.save()
+        await savedUser.populate("address")
+        const token=await generateToken(savedUser)
         res.status(201).json({
             code:201,
             status:true,
             message:"user signed up successfully!!",
-            token:token
+            token:token,
+            user: savedUser
         })
     }catch(error){
         next(error)

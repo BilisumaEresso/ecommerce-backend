@@ -1,4 +1,4 @@
-const { User, Order, Cart, Product, Payment } = require("../model");
+const { User, Order, Cart, Product, Payment, Address } = require("../model");
 const generateTransactionId = require("../utils/generateTransactionID");
 
 const getAllOrders = async (req, res, next) => {
@@ -38,9 +38,11 @@ const addOrder = async (req, res, next) => {
       throw new Error("unauthenticated");
     }
 
-    // optionally accept address or phoneNumber from body
-    const { address, phoneNumber } = req.body;
+    // extract address if sent
+    const bodyAddress = req.body?.address || null;
+    let phoneNumber = req.body?.phoneNumber || null;
 
+    // load cart
     const cart = await Cart.findOne({ user: userId }).populate("items.product");
     if (!cart) {
       res.status(404);
@@ -50,71 +52,103 @@ const addOrder = async (req, res, next) => {
       res.status(400);
       throw new Error("cart is empty");
     }
+
+    // STEP 1: Validate stock + calculate total
     let totalAmount = 0;
-    // build order items from cart
-    const orderItems = await Promise.all(
-      cart.items.map(async (item) => {
-        const price =
-          Number(item.price) || (item.product && Number(item.product.price)) || 0;
-        const quantity = Number(item.quantity) || 1;
-        totalAmount += price * quantity;
+    for (const item of cart.items) {
+      const product = item.product;
+      if (!product) {
+        throw new Error("invalid product in cart");
+      }
 
-        // product may already be populated on the cart item, otherwise load it
-        let productDoc =
-          item.product && item.product._id
-            ? item.product
-            : await Product.findById(item.product);
+      const quantity = Number(item.quantity) || 1;
+      if (product.quantity < quantity) {
+        throw new Error(`not enough stock for product: ${product.name}`);
+      }
 
-        if (productDoc) {
-          productDoc.quantity = Number(productDoc.quantity || 0) - quantity;
-          if (productDoc.quantity<1){
-            throw new Error("no enough products")
-          }
-          // if this is a mongoose document, save the change
-          if (typeof productDoc.save === "function") {
-            await productDoc.save();
-          } else {
-            // fallback: if we loaded via id, ensure update persisted
-            await Product.findByIdAndUpdate(productDoc._id || item.product, {
-              $set: { quantity: productDoc.quantity },
-            }).exec();
-          }
-        }
+      const price = Number(product.price);
+      totalAmount += price * quantity;
 
-        return {
-          product:
-            item.product && item.product._id ? item.product._id : item.product,
-          quantity,
-          price,
-          totalItemPrice: price * quantity,
-        };
-      })
-    );
+      // record price on item to use later
+      item._calculatedPrice = price;
+    }
 
+    // STEP 2: Resolve shipping address
+    let addressId = null;
+
+    if (!bodyAddress || Object.keys(bodyAddress).length === 0) {
+      // no address provided, use default
+      const user = await User.findById(userId);
+      if (!user.address) {
+        throw new Error("no default address found, please provide address");
+      }
+      addressId = user.address;
+    } else {
+      // address provided: create new address entry
+      var newAddress = new Address(bodyAddress);
+      if (bodyAddress.phoneNumber && !phoneNumber) {
+        phoneNumber = bodyAddress.phoneNumber;
+      }
+      await newAddress.save();
+      addressId = newAddress._id;
+    }
+
+    // STEP 3: Build order items list
+    const orderItems = cart.items.map((item) => {
+      const quantity = Number(item.quantity) || 1;
+      const price = item._calculatedPrice;
+
+      return {
+        product: item.product._id,
+        quantity,
+        price,
+        totalItemPrice: price * quantity,
+      };
+    });
+
+    // STEP 4: Create order
     const order = await Order.create({
       user: userId,
       phoneNumber: phoneNumber || undefined,
       items: orderItems,
-      address: address || undefined,
+      totalAmount,
+      address: addressId,
       cart: cart._id,
-      totalAmount
+      status: "pending",
+      paymentStatus: "unpaid",
     });
 
-    // clear cart
+    // STEP 5: Deduct stock AFTER order created
+    for (const item of cart.items) {
+      const product = item.product;
+      const quantity = Number(item.quantity);
+
+      await Product.findByIdAndUpdate(
+        product._id,
+        { $inc: { quantity: -quantity } },
+        { new: true }
+      );
+    }
+
+    // STEP 6: Empty cart
     cart.items = [];
     cart.totalPrice = 0;
     await cart.save();
+     
+    const address=await Address.findById(addressId)
 
     res.status(201).json({
       code: 201,
       status: true,
       message: "order placed successfully",
       order,
+      address
     });
   } catch (error) {
     next(error);
   }
 };
+
 
 const getOrder=async(req,res,next)=>{
     try{

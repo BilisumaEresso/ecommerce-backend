@@ -1,4 +1,4 @@
-const { Product, File, Review } = require("../model");
+const { Product, File, Review, Category } = require("../model");
 const mongoose = require("mongoose");
 const cloudinary = require("../config/cloudinary");
 const path = require("path");
@@ -12,6 +12,10 @@ const addProduct = async (req, res, next) => {
     if (productExist) {
       res.code = 400;
       throw new Error("Product name is taken");
+    }
+    const isCategory= await Category.findById(category)
+    if(!isCategory){
+      throw new Error("category doesn't exist")
     }
     const product = new Product();
     product.name = name;
