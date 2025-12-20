@@ -3,6 +3,7 @@ const categoryRoute=require("./category")
 const productRouter=require("./product")
 const orderRouter=require("./order")
 const cartRouter=require("./cart")
+const aiRouter=require("./ai")
 
 
-module.exports = { authRoute, categoryRoute, productRouter,orderRouter,cartRouter };
+module.exports = { authRoute, categoryRoute, productRouter,orderRouter,cartRouter,aiRouter };

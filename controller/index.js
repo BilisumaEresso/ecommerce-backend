@@ -3,5 +3,6 @@ const categoryController=require("./category")
 const productController=require("./product")
 const cartController=require("./cart")
 const orderController=require("./order")
+const aiController=require("./ai")
 
-module.exports={authController,categoryController,productController,cartController,orderController}
+module.exports={authController,categoryController,productController,cartController,orderController,aiController}
