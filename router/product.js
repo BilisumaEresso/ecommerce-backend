@@ -45,6 +45,7 @@ router.put(
 );
 router.delete("/:id", isAuth, isAdmin, productController.deleteProduct);
 router.get("/", productController.getProducts);
+router.get("/ai-search",productController.searchProducts)
 router.get("/category/:categoryId", productController.getProductsByCategory);
 router.get("/:id", productController.getProductById);
 

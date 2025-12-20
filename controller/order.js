@@ -125,7 +125,8 @@ const addOrder = async (req, res, next) => {
 
       await Product.findByIdAndUpdate(
         product._id,
-        { $inc: { quantity: -quantity } },
+        { $inc: { quantity: -quantity },
+      sold:+quantity },
         { new: true }
       );
     }
@@ -166,7 +167,7 @@ const getOrder=async(req,res,next)=>{
             order
         })
     }catch(error){
-
+      next(error)
     }
 }
 

@@ -2,7 +2,9 @@ const { Product, File, Review, Category } = require("../model");
 const mongoose = require("mongoose");
 const cloudinary = require("../config/cloudinary");
 const path = require("path");
-const { escape } = require("querystring");
+const {validateAiSearch}=require("../validator/aiSearch")
+const {aiSearchIntent}=require("../services/ai/aiSearch.services")
+// const { escape } = require("querystring");
 
 const addProduct = async (req, res, next) => {
   try {
@@ -149,7 +151,61 @@ const addProductImages = async (req, res, next) => {
     next(error);
   }
 };
+const searchProducts = async (req, res, next) => {
+  try {
+    const q = req.query.q?.trim();
+    if (!q) {
+      return res.json(await Product.find());
+    }
 
+    const isComplex = q.split(" ").length > 3;
+
+    if (!isComplex) {
+      const products = await Product.find({
+        $text: { $search: q },
+      });
+      return res.json(products);
+    }
+
+    const aiResult = await aiSearchIntent(q);
+
+    const categories = await Category.find().select("name");
+    const allowedCategories = categories.map((c) => c.name);
+
+    const filters = validateAiSearch(aiResult, allowedCategories);
+    if (!filters) throw new Error("AI validation failed");
+
+    const mongoQuery = {};
+
+    if (filters.keywords.length) {
+      mongoQuery.$text = { $search: filters.keywords.join(" ") };
+    }
+
+    if (filters.category) {
+      const cat = await Category.findOne({ name: filters.category });
+      if (cat) mongoQuery.category = cat._id;
+    }
+
+    if (filters.price.min || filters.price.max) {
+      mongoQuery.price = {};
+      if (filters.price.min) mongoQuery.price.$gte = filters.price.min;
+      if (filters.price.max) mongoQuery.price.$lte = filters.price.max;
+    }
+
+    let sort = {};
+    if (filters.sort === "price_asc") sort.price = 1;
+    if (filters.sort === "price_desc") sort.price = -1;
+    if (filters.sort === "popular") sort.sold = -1;
+    if (filters.sort === "newest") sort.createdAt = -1;
+
+    const products = await Product.find(mongoQuery).sort(sort);
+    res.status(200).json({
+      aiResult,
+      products});
+  } catch (err) {
+    next(err);
+  }
+};
 const getProducts = async (req, res, next) => {
   try {
     const { q } = req.query;
@@ -536,4 +592,5 @@ module.exports = {
   getReview,
   getAllReview,
   getUserReview,
+  searchProducts,
 };

@@ -8,6 +8,7 @@ const productSchema = new mongoose.Schema(
     price: { type: String, required: true },
     averageRating: {type: Number, default:0 },
     rateNumber:{type:Number,default:0},
+    sold:{type:Number,default:0},
     category: {
       type: mongoose.Types.ObjectId,
       ref: "category",
@@ -20,6 +21,7 @@ const productSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+productSchema.index({ name: "text", desc: "text" });
 
 const Product = mongoose.model("product", productSchema);
 
