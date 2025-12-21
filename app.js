@@ -1,5 +1,6 @@
 const express = require("express");
 const connectMongoDb = require("./config/mongoDb");
+const cors=require("cors")
 const { authRoute, categoryRoute, productRouter, orderRouter, cartRouter, aiRouter } = require("./router");
 const errorHandler = require("./middleware/errorHandler");
 const notFound = require("./controller/notFound");
@@ -7,7 +8,7 @@ const notFound = require("./controller/notFound");
 require("./config/cloudinary");
 
 const app = express();
-
+app.use(cors())
 // middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
