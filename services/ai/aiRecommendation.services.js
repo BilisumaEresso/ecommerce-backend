@@ -6,12 +6,10 @@ const client = new OpenAI({
   baseURL: process.env.AI_BASE_URL,
 });
 
-/**
- * Build minimal cart summary for AI
- */
+
 const buildCartSummary = (cart) => {
   if (!cart || !cart.items || cart.items.length === 0) {
-    console.log("empty cart")
+   
     return {
       categories: [],
       products: [],
@@ -44,12 +42,9 @@ const buildCartSummary = (cart) => {
   };
 };
 
-/**
- * Build minimal order history summary for AI
- */
+
 const buildOrderSummary = (orders) => {
   if (!orders || orders.length === 0) {
-    console.log("empty order")
     return {
       topCategories: [],
       avgSpend: null,
@@ -90,7 +85,7 @@ const buildOrderSummary = (orders) => {
 
 const aiRecommendationIntent = async (userId) => {
   try {
-    console.log(userId)
+   
     const cart = await Cart.findOne({ user: userId })
       .populate("items.product")
       .populate("items.product.category");
@@ -100,7 +95,7 @@ const aiRecommendationIntent = async (userId) => {
       .limit(5)
       .populate("items.product")
       .populate("items.product.category");
-    console.log(cart,orders);
+ 
     const cartSummary = buildCartSummary(cart);
     const orderSummary = buildOrderSummary(orders);
 

@@ -1,63 +1,86 @@
-const Product = require("../model/Product");
+const {Product,Trending,Category} = require("../model");
 const { aiRecommendationIntent } = require("../services/ai/aiRecommendation.services");
+const {
+  buildProductRecommendationQuery,
+} = require("../services/recommendationBuilder.services");
+const { generateTrendsFromAI } = require("../services/ai/aiTrends.services");
 
-const getRecommendedProducts = async (req, res, next) => {
+const recommendProducts = async (req, res, next) => {
   try {
-    const userId = req.user.id;
+    const intent = await aiRecommendationIntent(req.user.id);
 
-    // 1. Get AI intent (already optimized & single call)
-    const intent = await aiRecommendationIntent(userId);
+    const productQuery = await buildProductRecommendationQuery(intent);
 
-    const {
-      primaryCategories = [],
-      secondaryCategories = [],
-      keywords = [],
-      pricePreference = {},
-    } = intent;
-
-    // 2. Build MongoDB query dynamically
-    const query = {
-      quantity: { $gt: 0 }, // only available products
-    };
-
-    if (primaryCategories.length || secondaryCategories.length) {
-      query.category = {
-        $in: [...primaryCategories, ...secondaryCategories],
-      };
-    }
-
-    if (keywords.length) {
-      query.$or = [
-        { name: { $regex: keywords.join("|"), $options: "i" } },
-        { desc: { $regex: keywords.join("|"), $options: "i" } },
-      ];
-    }
-
-    if (pricePreference.min != null || pricePreference.max != null) {
-      query.price = {};
-      if (pricePreference.min != null) query.price.$gte = pricePreference.min;
-      if (pricePreference.max != null) query.price.$lte = pricePreference.max;
-    }
-
-    // 3. Execute query
-    const products = await Product.find(query)
-      .populate("category", "name slug")
-      .sort({
-        createdAt: -1, // freshness bias
-      })
-      .limit(10);
+    const products = await Product.find(productQuery)
+      .populate("category", "name")
+      .limit(20)
+      .lean();
 
     res.status(200).json({
-      status: true,
+      success: true,
       strategy: intent.recommendationStrategy,
       confidence: intent.confidence,
       count: products.length,
-      products,
+      data: products,
     });
   } catch (error) {
     next(error);
   }
 };
 
-module.exports = { getRecommendedProducts };
+
+
+// 🔹 Generate & store trends (manual trigger)
+const generateTrends = async (req, res, next) => {
+  try {
+    // 1. Load allowed categories
+    const categories = await Category.find().select("name -_id");
+    const categoryNames = categories.map((c) => c.name);
+
+    // 2. Ask AI
+    const aiResult = await generateTrendsFromAI(categoryNames);
+
+    if (!aiResult.trends || !Array.isArray(aiResult.trends)) {
+      throw new Error("Invalid AI trend response");
+    }
+
+    await Trending.deleteMany({});
+
+    const savedTrends = await Trending.insertMany(
+      aiResult.trends.map((t) => ({
+        name: t.name,
+        category: t.category,
+        reason: t.reason,
+        source: t.source || "AI trend analysis",
+      }))
+    );
+
+    res.status(201).json({
+      status: true,
+      count: savedTrends.length,
+      trends: savedTrends,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// 🔹 Fetch trends for frontend
+const getTrends = async (req, res, next) => {
+  try {
+    const trends = await Trending.find().sort({ createdAt: -1 });
+
+    res.status(200).json({
+      status: true,
+      count: trends.length,
+      trends,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+
+
+module.exports = { recommendProducts, generateTrends, getTrends };
 
