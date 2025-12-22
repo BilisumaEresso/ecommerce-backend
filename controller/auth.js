@@ -122,4 +122,23 @@ const changePassword=async(req,res,next)=>{
     }
 }
 
-module.exports={signup,login,updateProfile,changePassword}
+const getUser = async (req, res, next) => {
+  try {
+    const { id } = req.user;
+    const user = await User.findById(id).populate("address");
+    if (!user) {
+      res.code = 404;
+      throw new Error("user not found");
+    }
+     res.status(200).json({
+       code: 200,
+       status: true,
+       message: "user info fetched successfully successfully",
+       user
+     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+module.exports={signup,login,updateProfile,changePassword,getUser}
