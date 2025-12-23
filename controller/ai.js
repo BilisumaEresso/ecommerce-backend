@@ -12,16 +12,16 @@ const recommendProducts = async (req, res, next) => {
     const productQuery = await buildProductRecommendationQuery(intent);
 
     const products = await Product.find(productQuery)
-      .populate("category", "name")
+      .populate("category", "name").populate("photo")
       .limit(20)
       .lean();
 
     res.status(200).json({
-      success: true,
+      status: true,
       strategy: intent.recommendationStrategy,
       confidence: intent.confidence,
       count: products.length,
-      data: products,
+      products,
     });
   } catch (error) {
     next(error);

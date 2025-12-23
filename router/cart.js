@@ -9,5 +9,4 @@ router.delete("/:id",isAuth,cartController.removeFromCart)
 router.patch("/:productId",isAuth,cartController.updateCart)
 router.get("/user",isAuth,cartController.userCart)
 router.delete("/",isAuth,cartController.clearCart)
-
 module.exports=router

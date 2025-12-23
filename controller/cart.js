@@ -1,10 +1,11 @@
-const { Cart, Product } = require("../model");
+const { Cart, Product, User } = require("../model");
 
 const addToCart = async (req, res, next) => {
   try {
     const { productId, quantity = 1 } = req.body;
     const user = req.user && (req.user._id || req.user.id);
-    if (!user) {
+    const isUser=await User.findById(user)
+    if (!isUser) {
       res.status(401);
       throw new Error("unauthenticated");
     }
@@ -50,6 +51,7 @@ const addToCart = async (req, res, next) => {
         status: true,
         message: "added to cart successfully",
         cart,
+        user:isUser
       });
     } else {
       const newCart = new Cart();
@@ -62,6 +64,7 @@ const addToCart = async (req, res, next) => {
         status: true,
         message: "added to cart successfully",
         cart: newCart,
+        
       });
     }
   } catch (error) {
@@ -176,12 +179,8 @@ const updateCart=async(req,res,next)=>{
 
 const userCart=async(req,res,next)=>{
   try{
-    const user=req.user._id
-    const cart =await Cart.findOne(user).populate("items.product")
-    if(!cart){
-      res.code=404
-      throw new Error("You have empty cart")
-    }
+    const user = req.user._id || req.user.id;
+    const cart =await Cart.findOne({user:user}).populate("items.product")
     res.status(200).json({
       code:200,
       status:true,

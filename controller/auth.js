@@ -37,7 +37,7 @@ const signup=async(req,res,next)=>{
 const login=async(req,res,next)=>{
     try{
         const {email,password}=req.body
-        const user=await User.findOne({email})
+        var user=await User.findOne({email})
         if(!user){
             res.code=404
             throw new Error("email does not exist")
@@ -49,11 +49,17 @@ const login=async(req,res,next)=>{
        }
        token= await generateToken(user)
        res.status(200).json({
-        code:200,
-        status:true,
-        message:"user logged in successfully",
-        token:token
-       })
+         code: 200,
+         status: true,
+         message: "user logged in successfully",
+         token: token,
+         user: {
+           id: user._id,
+           name: user.name,
+           email: user.email,
+           role: user.role, // 1 buyer | 2 seller | 3 superAdmin
+         },
+       });
     }catch(error){
         next(error)
     }

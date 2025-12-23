@@ -198,7 +198,7 @@ const searchProducts = async (req, res, next) => {
     if (filters.sort === "popular") sort.sold = -1;
     if (filters.sort === "newest") sort.createdAt = -1;
 
-    const products = await Product.find(mongoQuery).sort(sort);
+    const products = await Product.find(mongoQuery).populate("photo").sort(sort);
     res.status(200).json({
       aiResult,
       products});
