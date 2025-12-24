@@ -164,7 +164,11 @@ const searchProducts = async (req, res, next) => {
       const products = await Product.find({
         $text: { $search: q },
       });
-      return res.json(products);
+      return res.json({
+        status:true,
+        message:"product fetched successfully",
+        products:products
+      });
     }
 
     const aiResult = await aiSearchIntent(q);
@@ -200,8 +204,10 @@ const searchProducts = async (req, res, next) => {
 
     const products = await Product.find(mongoQuery).populate("photo").sort(sort);
     res.status(200).json({
-      aiResult,
-      products});
+      status: true,
+      message: "product fetched successfully",
+      products: products,
+    });
   } catch (err) {
     next(err);
   }

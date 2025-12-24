@@ -145,7 +145,7 @@ Rules:
 
     return JSON.parse(response.choices[0].message.content);
   } catch (error) {
-    next(error)
+    throw new Error(error)
   }
 }
 

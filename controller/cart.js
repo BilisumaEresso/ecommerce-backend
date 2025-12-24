@@ -74,9 +74,11 @@ const addToCart = async (req, res, next) => {
 
 const removeFromCart=async(req,res,next)=>{
   try{
-    const {productId}=req.body
+    const {productId}=req.params
     const user=req.user._id||req.user.id
-    const cart= await Cart.findOne({user:user})
+    const cart= await Cart.findOne({user:user}).populate("items.product")
+    console.log(user)
+    console.log(cart.items)
     if(!cart){
       res.code=404
       throw new Error("cart not found")
@@ -88,9 +90,10 @@ const removeFromCart=async(req,res,next)=>{
     }
 
     // find item index
-    const itemIndex = cart.items.findIndex(
-      (i) => i.product && i.product.toString() === productId.toString()
-    );
+   const itemIndex = cart.items.findIndex(
+     (i) => i.product && i.product._id.toString() === productId.toString()
+   );
+
 
     if (itemIndex === -1) {
       res.status(404);
@@ -135,8 +138,8 @@ const updateCart=async(req,res,next)=>{
     // product id
     const {productId}=req.params   
     const {newQuantity}=req.body
-    const user=req.user._id
-    const cart =await Cart.findOne(user)
+    const user=req.user._id||req.user.id
+    const cart =await Cart.findOne({user}).populate("items.product")
     if(!cart){
       res.code=404
       throw new Error("cart not found")
@@ -147,8 +150,9 @@ const updateCart=async(req,res,next)=>{
       throw new Error("product not found")
     }
      const itemIndex = cart.items.findIndex(
-       (i) => i.product && i.product.toString() === productId.toString()
+       (i) => i.product && i.product._id.toString() === productId.toString()
      );
+
 
       if (itemIndex === -1) {
         res.status(404);
