@@ -14,7 +14,7 @@ const orderSchema = new mongoose.Schema(
     ],
     address: { type: mongoose.Types.ObjectId, ref: "address" },
     cart: { type: mongoose.Types.ObjectId, ref: "cart" },
-    status: { type: String,enum:["pending","confirmed","paid","shipped","delivered","cancelled"],default:"pending" },
+    status: { type: String,enum:["pending","completed","shipped","delivered","cancelled"],default:"pending" },
     totalAmount:{type:Number,default:1,min:1}
   },
   { timestamps: true }

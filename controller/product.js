@@ -228,15 +228,22 @@ const getProducts = async (req, res, next) => {
           { price: { $regex: q, $options: "i" } },
         ],
       };
-      const products = await Product.find(filter).populate("photo");
+      const products = await Product.find(filter)
+        .populate("photo")
+        .populate("createdBy", "name email");
       if (products.length < 1) {
         throw new Error("product is not found !!");
       } else {
-        const products = await Product.find().populate("photo");
+        const products = await Product.find()
+          .populate("photo")
+          .populate("createdBy","name email");
         res.status(200).json({ code: 200, status: true, products });
       }
     } else {
-      const products = await Product.find().populate("photo").populate("category");
+      const products = await Product.find()
+        .populate("photo")
+        .populate("category")
+        .populate("createdBy", "name email");
       res.status(200).json({ code: 200, status: true, products });
     }
   } catch (error) {
