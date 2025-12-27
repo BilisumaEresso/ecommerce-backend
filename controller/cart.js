@@ -196,26 +196,39 @@ const userCart=async(req,res,next)=>{
   }
 }
 
-const clearCart=async(req,res,next)=>{
-  try{
-    const user=req.user._id
-    const cart=await Cart.findOne(user)
-    if(!cart){
-      res.code=404
-      throw new Error("cart not found")
+const clearCart = async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+
+    const cart = await Cart.findOneAndUpdate(
+      { user: userId },
+      {
+        $set: {
+          items: [],
+          totalPrice: 0,
+        },
+      },
+      { new: true }
+    );
+
+    if (!cart) {
+      return res.status(404).json({
+        code: 404,
+        status: false,
+        message: "Cart not found",
+      });
     }
-    cart.items.splice(0,cart.items.length)
-    cart.totalPrice=0
-    await cart.save()
+
     res.status(200).json({
-      code:200,
-      status:true,
-      message:"cleared successfully",
-      cart
-    })
-  }catch(error){
-    next (error)
+      code: 200,
+      status: true,
+      message: "Cart cleared successfully",
+      cart,
+    });
+  } catch (error) {
+    next(error);
   }
-}
+};
+
 
 module.exports = { addToCart,removeFromCart,updateCart,userCart,clearCart };

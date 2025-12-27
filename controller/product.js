@@ -19,6 +19,9 @@ const addProduct = async (req, res, next) => {
     if(!isCategory){
       throw new Error("category doesn't exist")
     }
+    isCategory.productCount+=1
+    await isCategory.save()
+
     const product = new Product();
     product.name = name;
     product.desc = desc;
@@ -233,7 +236,7 @@ const getProducts = async (req, res, next) => {
         res.status(200).json({ code: 200, status: true, products });
       }
     } else {
-      const products = await Product.find().populate("photo");
+      const products = await Product.find().populate("photo").populate("category");
       res.status(200).json({ code: 200, status: true, products });
     }
   } catch (error) {
@@ -345,6 +348,9 @@ const deleteProduct = async (req, res, next) => {
       res.status(404);
       throw new Error("Product not found");
     }
+    const category =await Category.findById(product.category)
+    category.productCount= category.productCount-1
+    await category.save()
     // delete associated files (both Cloudinary and in DB)
     if (product.photo && product.photo.length > 0) {
       const files = await File.find({ _id: { $in: product.photo } });
@@ -365,146 +371,106 @@ const deleteProduct = async (req, res, next) => {
 
 // Reviews
 // helper: recompute product aggregate ratings from reviews
+
 const recomputeProductStats = async (productId) => {
-  // ensure a valid ObjectId is used
-  const oid = mongoose.isValidObjectId(productId)
-    ? new mongoose.Types.ObjectId(productId)
-    : productId;
-  const res = await Review.aggregate([
-    { $match: { product: oid } },
+  const stats = await Review.aggregate([
+    { $match: { product: new mongoose.Types.ObjectId(productId) } },
     {
       $group: {
-        _id: null,
+        _id: "$product",
         averageRating: { $avg: "$rating" },
         rateNumber: { $sum: 1 },
       },
     },
   ]);
-  if (res && res.length > 0) {
-    const { averageRating, rateNumber } = res[0];
-    await Product.findByIdAndUpdate(productId, {
-      averageRating: averageRating || 0,
-      rateNumber: rateNumber || 0,
-    });
-  } else {
-    await Product.findByIdAndUpdate(productId, {
-      averageRating: 0,
-      rateNumber: 0,
-    });
+
+  let averageRating = 0;
+  let rateNumber = 0;
+
+  if (stats.length > 0 && stats[0].rateNumber > 0) {
+    averageRating = Number((stats[0].averageRating || 0).toFixed(1));
+    rateNumber = stats[0].rateNumber;
   }
+
+  await Product.findByIdAndUpdate(
+    productId,
+    { averageRating, rateNumber },
+    { new: true }
+  );
 };
-const addReview = async (req, res, next) => {
+
+
+
+const upsertReview = async (req, res, next) => {
   try {
-    const { id } = req.params;
+    const { id: productId } = req.params;
     const { rating, comment } = req.body;
+    const userId = req.user._id;
+
     if (!rating) {
-      res.status(400);
-      throw new Error("rating is required");
+      return res.status(400).json({ message: "Rating is required" });
     }
-    const product = await Product.findById(id);
-    if (!product) {
-      res.status(404);
-      throw new Error("Product not found");
+
+    const productExists = await Product.exists({ _id: productId });
+    if (!productExists) {
+      return res.status(404).json({ message: "Product not found" });
     }
-    const userId = req.user && req.user._id ? req.user._id : req.user.id;
-    const existing = await Review.findOne({ product: id, user: userId });
-    if (existing) {
-      // update the existing review (upsert behavior)
-      const oldRating = existing.rating;
-      if (rating) existing.rating = rating;
-      if (comment) existing.comment = comment;
-      await existing.save();
-      // recompute product stats after update
-      await recomputeProductStats(id);
-      return res
-        .status(200)
-        .json({ code: 200, status: true, review: existing });
-    }
-    // create new review
-    const review = new Review({
-      user: userId,
-      product: id,
-      rating,
-      comment,
-    });
-    try {
-      await review.save();
-    } catch (err) {
-      if (err && err.code === 11000) {
-        // unique constraint hit, return helpful message
-        res.status(400);
-        throw new Error(
-          "You already rated this product. Update your review instead."
-        );
+
+    const review = await Review.findOneAndUpdate(
+      { user: userId, product: productId },
+      { rating, comment },
+      {
+        new: true,
+        upsert: true,
+        setDefaultsOnInsert: true,
       }
-      throw err;
-    }
-    // recompute stats
-    await recomputeProductStats(id);
-    res.status(201).json({ code: 201, status: true, review });
+    );
+
+    await recomputeProductStats(productId);
+
+    res.status(200).json({
+      status: true,
+      review,
+    });
   } catch (error) {
     next(error);
   }
 };
 
-const updateReview = async (req, res, next) => {
-  try {
-    const { id, reviewId } = req.params; // product id, review id
-    const review = await Review.findById(reviewId);
-    if (!review) {
-      res.status(404);
-      throw new Error("Review not found");
-    }
-    // allow update if user is owner or admin
-    const userId =
-      req.user && req.user._id ? req.user._id.toString() : req.user.id;
-    if (review.user.toString() !== userId && !(req.user && req.user.isAdmin)) {
-      res.status(403);
-      throw new Error("not authorized to update review");
-    }
-    const { rating, comment } = req.body;
-    // If rating changed, update product averages
-    if (rating && rating !== review.rating) {
-      // update rating
-      review.rating = rating;
-      // recompute product stats for accuracy
-      await recomputeProductStats(id);
-    }
-    if (comment) review.comment = comment;
-    await review.save();
-    res.status(200).json({ code: 200, status: true, review });
-  } catch (error) {
-    next(error);
-  }
-};
+
+
+
 
 const deleteReview = async (req, res, next) => {
   try {
-    const { id, reviewId } = req.params;
-    const review = await Review.findById(reviewId);
-    if (!review) {
-      res.status(404);
-      throw new Error("Review not found");
+    const { id: productId } = req.params;
+    const userId = req.user._id;
+
+    const deleted = await Review.findOneAndDelete({
+      user: userId,
+      product: productId,
+    });
+
+    if (!deleted) {
+      return res.status(404).json({
+        status: false,
+        message: "Review not found",
+      });
     }
-    const userId =
-      req.user && req.user._id ? req.user._id.toString() : req.user.id;
-    if (review.user.toString() !== userId && !(req.user && req.user.isAdmin)) {
-      res.status(403);
-      throw new Error("not authorized to delete review");
-    }
-    // update product rating stats
-    const product = await Product.findById(id);
-    if (product) {
-      await recomputeProductStats(product._id);
-    }
-    await Review.findByIdAndDelete(reviewId);
-    res
-      .status(200)
-      .json({ code: 200, status: true, message: "review deleted" });
+
+    await recomputeProductStats(productId);
+
+    res.status(200).json({
+      status: true,
+      message: "Review deleted permanently",
+    });
   } catch (error) {
     next(error);
   }
 };
+
+
+
 
 const getReview = async (req, res, next) => {
   try {
@@ -527,7 +493,7 @@ const getUserReview = async (req, res, next) => {
   try {
     const { id } = req.params; // product id
     const userId = req.user && req.user._id ? req.user._id : req.user.id;
-    const review = await Review.findOne({ product: id, user: userId });
+    const review = await Review.findOne({ product: id, user: userId }).populate("user");
     if (!review) {
       return res
         .status(404)
@@ -592,8 +558,7 @@ module.exports = {
   getProductsByCategory,
   updateProduct,
   deleteProduct,
-  addReview,
-  updateReview,
+  upsertReview,
   deleteReview,
   getReview,
   getAllReview,

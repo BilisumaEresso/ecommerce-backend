@@ -37,7 +37,7 @@ const signup=async(req,res,next)=>{
 const login=async(req,res,next)=>{
     try{
         const {email,password}=req.body
-        var user=await User.findOne({email})
+        var user=await User.findOne({email}).populate("address")
         if(!user){
             res.code=404
             throw new Error("email does not exist")
@@ -58,6 +58,8 @@ const login=async(req,res,next)=>{
            name: user.name,
            email: user.email,
            role: user.role, // 1 buyer | 2 seller | 3 superAdmin
+           createdAt:user.createdAt,
+           address:user.address
          },
        });
     }catch(error){

@@ -54,16 +54,9 @@ router.post(
   isAuth,
   addReviewValidator,
   validate,
-  productController.addReview
+  productController.upsertReview
 );
-router.patch(
-  "/:id/review/:reviewId",
-  isAuth,
-  addReviewValidator,
-  validate,
-  productController.updateReview
-);
-router.delete("/:id/review/:reviewId", isAuth, productController.deleteReview);
+router.delete("/:id/review", isAuth, productController.deleteReview);
 // reviews listing and individual user review
 router.get("/:id/reviews", productController.getAllReview);
 router.get("/:id/review", isAuth, productController.getUserReview);

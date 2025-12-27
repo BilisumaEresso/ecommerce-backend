@@ -1,13 +1,16 @@
 const mongoose = require("mongoose");
 
-const categorySchema=new mongoose.Schema({
-    name:{type:String,unique:true,required:true},
-    desc:{type:String},
-    createdBy:{type:mongoose.Types.ObjectId,ref:"user"},
+const categorySchema = new mongoose.Schema(
+  {
+    name: { type: String, unique: true, required: true },
+    desc: { type: String },
+    createdBy: { type: mongoose.Types.ObjectId, ref: "user" },
     // slug is for user friendly routing like "laptops"
-    slug:{type:String}
-    
-},{timestamps:true})
+    slug: { type: String },
+    productCount :{type:Number, default:0}
+  },
+  { timestamps: true }
+);
 
 const Category= mongoose.model("category", categorySchema)
 
