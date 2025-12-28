@@ -39,7 +39,7 @@ Return JSON in this exact format:
 Rules:
 - category must be from allowed list
 - keep reasons short
-- max 8 trends
+- max 12 trends
 - JSON only
         `,
       },

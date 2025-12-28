@@ -17,6 +17,7 @@ const getAllOrders = async (req, res, next) => {
 
     const orders = await Order.find({ user: userId })
       .populate("items.product")
+      .populate("user","name email")
       .populate("address");
 
     res.status(200).json({
@@ -231,6 +232,7 @@ const payNow=async(req,res,next)=>{
       res.code=404
       throw new Error("order not found")
     }
+
      do {
       var code=await generateTransactionId(16)
       var exists=await Payment.findOne({transactionId:code})
@@ -246,6 +248,8 @@ const payNow=async(req,res,next)=>{
         payment.amount=amount,
         payment.status=status
       await payment.save()
+      order.status="completed"
+      order.save()
       res.status(201).json({
         code:201,
         status:true,

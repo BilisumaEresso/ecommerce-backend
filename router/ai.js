@@ -8,7 +8,7 @@ const isSuperAdmin = require("../middleware/isSuperAdmin")
 const router=express.Router()
 
 router.get("/recommend",isAuth,aiController.recommendProducts)
-router.post("/trends",isAuth,isSuperAdmin,aiController.generateTrends)
+router.post("/trends",aiController.generateTrends)
 router.get("/trends",aiController.getTrends)
 
 module.exports=router
